@@ -55,6 +55,7 @@
     <label><input type="checkbox" id="optBakery"> 베이커리 포함</label>
     <label><input type="checkbox" id="optLoose"> 기준 완화 (3.8↑·50개↑)</label>
   </div>
+  <div id="usage" style="font-size:13px;color:#7A6F5F;margin:0 2px"></div>
   <div id="status"></div>
   <div id="map"></div>
   <button class="btn" id="copyBtn">📋 후보 목록 복사 (Claude 검증용)</button>
@@ -87,6 +88,22 @@ const BAKERY_TYPES = ["bakery"];
 /* ===== 키 저장 ===== */
 const LS = { get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}} };
 const $ = id => document.getElementById(id);
+
+/* ===== 무료 범위 보호 (앱 자체 사용량 제한) =====
+   구글 평점·리뷰 데이터 무료 한도(월 약 1,000건)를 넘지 않도록
+   이 기기에서 쓴 호출 수를 세어 미리 멈춥니다. */
+const MONTH_LIMIT = 900;   // 월 최대 호출 수 (무료 한도보다 여유 있게)
+const DAY_LIMIT   = 40;    // 하루 최대 호출 수 (검색 약 8~10번)
+function ymd(){const d=new Date();return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();}
+function ym(){const d=new Date();return d.getFullYear()+"-"+(d.getMonth()+1);}
+function getUsage(){
+  let u={}; try{u=JSON.parse(LS.get("usage")||"{}")}catch(e){}
+  if(u.month!==ym()) {u.month=ym(); u.m=0;}
+  if(u.day!==ymd()) {u.day=ymd(); u.d=0;}
+  return u;
+}
+function addUsage(n){const u=getUsage(); u.m+=n; u.d+=n; LS.set("usage",JSON.stringify(u)); showUsage();}
+function showUsage(){const u=getUsage(); $("usage").textContent=`이번 달 사용 ${u.m}/${MONTH_LIMIT}건 · 오늘 ${u.d}/${DAY_LIMIT}건 (무료 범위 보호 중)`;}
 function openKey(){ $("keyInput").value = LS.get("gmapsKey")||""; $("modal").style.display="flex"; }
 $("keyBtn").onclick = openKey;
 $("keyCancel").onclick = ()=> $("modal").style.display="none";
@@ -164,9 +181,13 @@ async function run(region){
     const {AdvancedMarkerElement, PinElement} = await google.maps.importLibrary("marker");
     const fields=["id","displayName","formattedAddress","location","rating","userRatingCount","types","businessStatus","reviews","googleMapsURI","nationalPhoneNumber"];
     const qs=[...QUERIES]; if($("optBakery").checked) qs.push(BAKERY_QUERY);
+    const u=getUsage();
+    if(u.m+qs.length>MONTH_LIMIT) throw new Error(`이번 달 무료 범위 보호 한도(${MONTH_LIMIT}건)에 도달했어요. 다음 달 1일에 다시 쓸 수 있어요.`);
+    if(u.d+qs.length>DAY_LIMIT) throw new Error(`오늘 한도(${DAY_LIMIT}건)에 도달했어요. 내일 다시 써 주세요.`);
     const all=new Map();
     for(let i=0;i<qs.length;i++){
       setStatus(`검색 중… (${i+1}/${qs.length}) ${region} ${qs[i]}`);
+      addUsage(1);
       const {places}=await Place.searchByText({textQuery:`${region} ${qs[i]}`,fields,language:"ko",region:"kr",maxResultCount:20});
       (places||[]).forEach(p=>{ if(!all.has(p.id)) all.set(p.id,p); });
     }
@@ -250,6 +271,7 @@ function render(pick,out,region,lib){
 }
 
 $("form").addEventListener("submit",e=>{ e.preventDefault(); const r=$("region").value.trim(); if(r) run(r); });
+showUsage();
 if(!LS.get("gmapsKey")) setTimeout(openKey,300);
 </script>
 </body>
