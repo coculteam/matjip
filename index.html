@@ -177,7 +177,7 @@ async function run(region){
     setStatus("구글 지도 불러오는 중…");
     await loadMaps();
     const {Place} = await google.maps.importLibrary("places");
-    const {Map} = await google.maps.importLibrary("maps");
+    const {Map: GMap} = await google.maps.importLibrary("maps");
     const {AdvancedMarkerElement, PinElement} = await google.maps.importLibrary("marker");
     const fields=["id","displayName","formattedAddress","location","rating","userRatingCount","types","businessStatus","reviews","googleMapsURI","nationalPhoneNumber"];
     const qs=[...QUERIES]; if($("optBakery").checked) qs.push(BAKERY_QUERY);
@@ -214,7 +214,7 @@ async function run(region){
     for(const x of pass){ if(pick.length>=10) break; if(!pick.includes(x)) pick.push(x); }
     pick.sort((x,y)=>y.s-x.s);
 
-    render(pick, out, region, {Map,AdvancedMarkerElement,PinElement});
+    render(pick, out, region, {GMap,AdvancedMarkerElement,PinElement});
     setStatus(pick.length? `후보 ${all.size}곳 중 기준 통과 ${pass.length}곳 → 추천 ${pick.length}곳 (구글 기준, ${new Date().toLocaleDateString("ko-KR")} 조회)` : `기준을 통과한 곳이 없어요. 후보 ${all.size}곳 (아래 '빠진 곳' 참고)`);
   }catch(e){ setStatus("❌ "+(e.message||e)); }
   finally{ $("go").disabled=false; }
@@ -224,7 +224,7 @@ function render(pick,out,region,lib){
   // 지도
   if(pick.length){
     $("map").style.display="block";
-    if(!map) map=new lib.Map($("map"),{center:pick[0].p.location,zoom:14,mapId:"DEMO_MAP_ID",gestureHandling:"cooperative",streetViewControl:false,mapTypeControl:false});
+    if(!map) map=new lib.GMap($("map"),{center:pick[0].p.location,zoom:14,mapId:"DEMO_MAP_ID",gestureHandling:"cooperative",streetViewControl:false,mapTypeControl:false});
     markers.forEach(m=>m.map=null); markers=[];
     const b=new google.maps.LatLngBounds();
     pick.forEach((x,i)=>{
